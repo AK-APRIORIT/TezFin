@@ -8,9 +8,11 @@ jobs:
   build_and_test_smart_contracts:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v2
-      - uses: actions/setup-python@v2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
       - name: "Install SmartPy"
         run: |
           bash <(curl -s https://legacy.smartpy.io/cli/install.sh) --yes
@@ -24,8 +26,15 @@ jobs:
   build_and_test_typescript:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            src/util/package-lock.json
+            postdeploy/package-lock.json
+            src/ui/package-lock.json
       - name: "Build and test utility package"
         working-directory: src/util
         run: |
@@ -34,6 +43,11 @@ jobs:
           npm test
       - name: "Build post-deployment package"
         working-directory: postdeploy
+        run: |
+          npm ci
+          npm run build
+      - name: "Build React production application"
+        working-directory: src/ui
         run: |
           npm ci
           npm run build
