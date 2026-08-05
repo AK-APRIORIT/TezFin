@@ -53,7 +53,7 @@ export const tokens = [
         assetType: AssetType.XTZ,
         address: ''
     },
-    {
+    process.env.REACT_APP_ENV !== 'tezosx-previewnet' && {
         title: 'USDtz',
         name: 'USD Tez',
         logo: USDtz,
@@ -71,7 +71,7 @@ export const tokens = [
         assetType: AssetType.USDT,
         address: addresses.underlying.USDT?.address ?? ''
     },
-    process.env.REACT_APP_ENV !== 'tezosx-previewnet' && {
+    {
         title: 'tzBTC',
         name: 'tzBTC',
         logo: tzBTC,
@@ -81,7 +81,7 @@ export const tokens = [
         visibilityThreshold: 0.0000001,
         address: addresses.underlying.TZBTC?.address ?? ''
     },
-    {
+    process.env.REACT_APP_ENV !== 'tezosx-previewnet' && {
         title: 'stXTZ',
         name: 'stXTZ',
         logo: stXTZ,

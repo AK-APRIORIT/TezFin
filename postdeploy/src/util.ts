@@ -55,12 +55,28 @@ export async function initKeystore(keystoreConfig: any = undefined): Promise<{
   if (keystoreConfig == null) {
     keystoreConfig = config.keystore;
   }
-  let keystore = await KeyStoreUtils.restoreIdentityFromFundraiser(
-    keystoreConfig.mnemonic.join(" "),
-    keystoreConfig.email,
-    keystoreConfig.password,
-    keystoreConfig.pkh
-  );
+  let keystore: KeyStore;
+  if (keystoreConfig.mnemonic && !keystoreConfig.email) {
+    // plain mnemonic from Temple Wallet (no fundraiser email/password)
+    const path = keystoreConfig.derivationPath || "44'/1729'/0'/0'";
+    // conseiljs-softsigner requires m/ prefix
+    const normalizedPath = path.startsWith('m/') ? path : `m/${path}`;
+    keystore = await KeyStoreUtils.restoreIdentityFromMnemonic(
+      keystoreConfig.mnemonic.join(" "),
+      keystoreConfig.password || "",
+      keystoreConfig.pkh,
+      normalizedPath
+    );
+  } else if (keystoreConfig.secretKey) {
+    keystore = await KeyStoreUtils.restoreIdentityFromSecretKey(keystoreConfig.secretKey);
+  } else {
+    keystore = await KeyStoreUtils.restoreIdentityFromFundraiser(
+      keystoreConfig.mnemonic.join(" "),
+      keystoreConfig.email,
+      keystoreConfig.password,
+      keystoreConfig.pkh
+    );
+  }
   let signer = await SoftSigner.createSigner(
     TezosMessageUtils.writeKeyWithHint(keystore.secretKey, "edsk")
   );
@@ -162,48 +178,36 @@ export async function statOperation(result) {
 
 export async function parseProtocolAddress(path: string) {
   const protocolAddressesJSON = JSON.parse(fs.readFileSync(path, "utf8"));
-  const fTokensReverse = {};
+  const fTokensReverse: Record<string, AssetType> = {};
   fTokensReverse[protocolAddressesJSON.CXTZ] = AssetType.XTZ;
-  fTokensReverse[protocolAddressesJSON.CETHtz] = AssetType.ETH;
-  fTokensReverse[protocolAddressesJSON.CUSDtz] = AssetType.USD;
-  fTokensReverse[protocolAddressesJSON.CBTCtz] = AssetType.BTC;
+  fTokensReverse[protocolAddressesJSON.CUSDt] = 'USDT' as AssetType;
+  fTokensReverse[protocolAddressesJSON.CtzBTC] = 'TZBTC' as AssetType;
   const oracleStorage = await TezosNodeReader.getContractStorage(
     config.tezosNode,
     protocolAddressesJSON.TezFinOracle
   );
-  const oracleMap = Number(
-    JSONPath({ path: "$.args[2].int", json: oracleStorage })[0]
-  );
   const protoAddress: ProtocolAddresses = {
     fTokens: {
-      BTC: protocolAddressesJSON.CBTCtz,
       XTZ: protocolAddressesJSON.CXTZ,
-      ETH: protocolAddressesJSON.CETHtz,
-      USD: protocolAddressesJSON.CUSDtz,
+      USDT: protocolAddressesJSON.CUSDt,
+      TZBTC: protocolAddressesJSON.CtzBTC,
     },
-    fTokensReverse: fTokensReverse,
+    fTokensReverse,
     underlying: {
-      ETH: {
-        assetType: AssetType.ETH,
-        tokenStandard: TokenStandard.FA12,
-        decimals: 18,
-        address: protocolAddressesJSON.ETHtz,
-        balancesMapId: 34651,
-      },
-      USD: {
-        assetType: AssetType.USD,
-        address: protocolAddressesJSON.USDtz,
-        balancesMapId: 34654,
-        tokenStandard: TokenStandard.FA12,
-        decimals: 6,
-      },
-      BTC: {
-        assetType: AssetType.BTC,
+      USDT: {
+        assetType: 'USDT' as AssetType,
         tokenStandard: TokenStandard.FA2,
-        decimals: 8,
-        address: protocolAddressesJSON.BTCtz,
+        decimals: 6,
+        address: protocolAddressesJSON.USDt,
         tokenId: 0,
-        balancesMapId: 34646,
+        balancesMapId: 0,
+      },
+      TZBTC: {
+        assetType: 'TZBTC' as AssetType,
+        tokenStandard: TokenStandard.FA12,
+        decimals: 8,
+        address: protocolAddressesJSON.tzBTC,
+        balancesMapId: 0,
       },
       XTZ: {
         assetType: AssetType.XTZ,
@@ -214,9 +218,8 @@ export async function parseProtocolAddress(path: string) {
     comptroller: protocolAddressesJSON.Comptroller,
     interestRateModel: {
       XTZ: protocolAddressesJSON.CXTZ_IRM,
-      ETH: protocolAddressesJSON.CFA12_IRM,
-      USD: protocolAddressesJSON.CFA12_IRM,
-      BTC: protocolAddressesJSON.CFA2_IRM,
+      USDT: protocolAddressesJSON.CFA2_IRM,
+      TZBTC: protocolAddressesJSON.CtzBTC_IRM,
     },
     governance: protocolAddressesJSON.Governance,
     oracle: protocolAddressesJSON.TezFinOracle,

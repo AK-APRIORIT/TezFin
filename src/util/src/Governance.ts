@@ -23,6 +23,14 @@ export namespace Governance {
         timeDiff: number;
     }
 
+    export interface PriceBoundsPair {
+        comptrollerAddress: string;
+        cTokenAddress: string;
+        minPrice: string | number;
+        maxPrice: string | number;
+        maxChangeBps: number;
+    }
+
     function bool(value: boolean) {
         return { prim: value ? 'True' : 'False' };
     }
@@ -114,6 +122,43 @@ export namespace Governance {
                             args: [
                                 { string: oracle.oracleAddress },
                                 { int: String(oracle.timeDiff) },
+                            ],
+                        },
+                    ],
+                },
+            },
+        };
+    }
+
+    /** Configure oracle price bounds for a market (via Governance → Comptroller → Oracle). */
+    export function SetPriceBoundsOperation(bounds: PriceBoundsPair, governanceAddress: string): TransferParams {
+        return {
+            to: governanceAddress,
+            amount: 0,
+            mutez: true,
+            parameter: {
+                entrypoint: 'setPriceBounds',
+                value: {
+                    prim: 'Pair',
+                    args: [
+                        { string: bounds.comptrollerAddress },
+                        {
+                            prim: 'Pair',
+                            args: [
+                                { string: bounds.cTokenAddress },
+                                {
+                                    prim: 'Pair',
+                                    args: [
+                                        { int: String(bounds.minPrice) },
+                                        {
+                                            prim: 'Pair',
+                                            args: [
+                                                { int: String(bounds.maxPrice) },
+                                                { int: String(bounds.maxChangeBps) },
+                                            ],
+                                        },
+                                    ],
+                                },
                             ],
                         },
                     ],

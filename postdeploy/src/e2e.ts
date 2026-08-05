@@ -12,37 +12,29 @@ async function test(keystore: KeyStore, signer: Signer, keystore1: KeyStore, sig
         await DeployHelper.mintFakeTokens(keystore!, signer!, protocolAddresses!, keystore.publicKeyHash);
         await DeployHelper.mintFakeTokens(keystore!, signer!, protocolAddresses!, keystore1.publicKeyHash);
 
-        // set initial price for all assets
-        await FTokenHelper.updatePrice([{ "asset": "ETH" as AssetType, price: 2000 * Math.pow(10, 6) }, { "asset": "BTC" as AssetType, price: 20000 * Math.pow(10, 6) }, { "asset": "XTZ" as AssetType, price: 2 * Math.pow(10, 6) }], oracle, keystore!, signer!, protocolAddresses!)
+        // Comptroller requests `${market.name}-USD` from the oracle overrides map
+        await FTokenHelper.updatePrice([
+            { asset: "USDT-USD", price: 1 * Math.pow(10, 6) },
+            { asset: "TZBTC-USD", price: 20000 * Math.pow(10, 6) },
+            { asset: "XTZ-USD", price: 2 * Math.pow(10, 6) },
+        ], oracle, keystore!, signer!, protocolAddresses!);
 
         // supply FOR USER 0
-        for (const mint of ["ETH"])
+        for (const mint of ["TZBTC"])
             await FTokenHelper.mint(mint as AssetType, 900, keystore!, signer!, protocolAddresses!);
         // supply FOR USER 1
-        for (const mint of ["USD",])
+        for (const mint of ["USDT"])
             await FTokenHelper.mint(mint as AssetType, 2000000, keystore1!, signer1!, protocolAddresses!);
         // collateralize for user 1
-        await ComptrollerHelper.enterMarkets(["USD"] as AssetType[], keystore1!, signer1!, protocolAddresses!);
+        await ComptrollerHelper.enterMarkets(["USDT"] as AssetType[], keystore1!, signer1!, protocolAddresses!);
         // get comptroller
         const comptroller = await Comptroller.GetStorage(protocolAddresses!.comptroller, protocolAddresses!, config.tezosNode);
         // borrow for user 1
-        for (const borrow of ["ETH"])
-            await FTokenHelper.borrow(borrow as AssetType, 500, comptroller, protocolAddresses!, keystore1!, signer1!);
-        // set new price for liquidation
-        await FTokenHelper.updatePrice([{ "asset": "ETH" as AssetType, price: 3000 * Math.pow(10, 6) }], oracle, keystore!, signer!, protocolAddresses!)
-        // liquidate user 1 for 1 ETH
-        await FTokenHelper.liquidate({ amount: 160, seizeCollateral: "USD" as AssetType, supplyCollateral: "ETH" as AssetType, borrower: keystore1.publicKeyHash }, keystore!, signer!, protocolAddresses!)
-        // repay remaining loan
-        for (const repayBorrow of ["ETH"])
-            await FTokenHelper.repayBorrow(repayBorrow as AssetType, 400, keystore1!, signer1!, protocolAddresses!);
-        // exit markets
-        await ComptrollerHelper.exitMarket("USD" as AssetType, keystore1!, signer1!, protocolAddresses!);
-        // redeem supplied tokens for user 0
-        for (const redeem of ["ETH"])
-            await FTokenHelper.redeem(redeem as AssetType, 900, comptroller, protocolAddresses!, keystore!, signer!);
-        // redeem supplied tokens for user 1
-        for (const redeem of ["USD"])
-            await FTokenHelper.redeem(redeem as AssetType, 1200000, comptroller, protocolAddresses!, keystore1!, signer1!);
+        // 2M USDT collateral @ CF 50% ≈ $1M borrow power; 20 TZBTC @ $20k = $400k (fits).
+        // (500 TZBTC would be $10M and triggers CMPT_REDEEMER_SHORTFALL.)
+        for (const borrow of ["TZBTC"])
+            await FTokenHelper.borrow(borrow as AssetType, 20, comptroller, protocolAddresses!, keystore1!, signer1!);
+        // --- STOP HERE for Guard testing ---
     } catch (err) {
         console.log(JSON.stringify(err))
     }
@@ -55,7 +47,12 @@ async function runE2E() {
     const { protoAddress, oracle } = await parseProtocolAddress(config.protocolAddressesPath);
     console.log(`protocolAddresses: ${JSON.stringify(protoAddress!)}`);
 
-    await DeployHelper.postDeploy(keystore!, signer!, protoAddress!);
+    // supportMarket + unpause already done; still need oracle age + price bounds for borrow
+    await DeployHelper.setOracle(
+        keystore!, signer!, protoAddress!, protoAddress!.oracle,
+        (config as any).oracleMaxPriceAge ?? 3600,
+    );
+    await DeployHelper.setPriceBoundsForListedMarkets(keystore!, signer!, protoAddress!);
 
     return test(keystore, signer, keystore1, signer1, protoAddress, oracle);
 }

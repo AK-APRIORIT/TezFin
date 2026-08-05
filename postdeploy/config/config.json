@@ -1,66 +1,64 @@
 {
     "loglevel": "info",
-    "tezosNode": "https://ghostnet.ecadinfra.com",
+    "tezosNode": "https://michelson.previewnet.tezosx.nomadic-labs.com",
     "conseilServer": {
         "url": "https://conseil-ithaca.cryptonomic-infra.tech:443",
         "apiKey": "328ac16b-5497-4e73-a97d-45af0e83425c",
-        "network": "ghostnet"
+        "network": "previewnet"
     },
     "keystore": {
-        "pkh": "tz1VLnrVYrMtLHRUfLV594uvzSthZ5w7wXqE",
+        "pkh": "tz1XTWbfhyWK9xmPAa6TyQUSv437JFgZDzgA",
         "mnemonic": [
-            "egg",
-            "zoo",
-            "cigar",
-            "oppose",
-            "shrimp",
-            "chair",
-            "wood",
-            "practice",
-            "trash",
-            "rice",
-            "spell",
-            "unhappy",
-            "disorder",
-            "zebra",
-            "kite"
+            "enlist",
+            "push",
+            "live",
+            "endorse",
+            "squirrel",
+            "income",
+            "fee",
+            "lemon",
+            "uniform",
+            "jaguar",
+            "goddess",
+            "daring"
         ],
-        "email": "zdnmiequ.ulruuquy@teztnets.xyz",
-        "password": "dlfsJnRlHy",
-        "amount": "22841330521",
-        "activation_code": "77c3e768abfdb7e389f7ccd890c091ba42b84a88"
+        "derivationPath": "m/44'/1729'/0'/0'",
+        "secretKey": "edsk3oSyJQKQWbQnCeUJg7pqs8LjvyVVhQd8kBwF6YFzvcMMyzhh6Z"
     },
     "keystore1": {
-        "pkh": "tz1ZDm7WEgVLtbwSbbV4zoj2wofKzBy6WNLL",
+        "pkh": "tz1LfCfS5kmSGwSW4mvs678QX91V7m6NnVi8",
         "mnemonic": [
-            "voice",
-            "firm",
-            "word",
-            "useless",
-            "mercy",
-            "winter",
-            "column",
-            "easily",
-            "rough",
-            "sword",
-            "dawn",
-            "hazard",
-            "stand",
-            "frog",
-            "letter"
+            "april",
+            "limit",
+            "title",
+            "tomato",
+            "reward",
+            "that",
+            "long",
+            "split",
+            "nose",
+            "duck",
+            "nose",
+            "cross"
         ],
-        "email": "suabjmnl.raykljyk@teztnets.xyz",
-        "password": "81jCALUUkz",
-        "amount": "8531395243",
-        "activation_code": "37a8b46f2b3c691d02ac76a595a1373bc44c751e"
+        "derivationPath": "m/44'/1729'/0'/0'",
+        "secretKey": "edsk3seBAhxUVdrj4edoE4SLqsVQBnfpDEQiXtLhXo5WZJq7evBo7j"
     },
     "networkBlockTime": 31,
     "delay": 7,
     "revealAccount": false,
-    "protocolAddressesPath": "./e2e/deploy_result/deploy.json",
+    "oracleMaxPriceAge": 3600,
+    "priceBounds": {
+        "minPrice": 1,
+        "maxPrice": "100000000000000000000000000000000000000000000000000",
+        "maxChangeBps": 10000
+    },
+    "comptrollerGovernance": "KT1BGtPh5kvDQUyoEUZA52b7WAcAaMjk5qwh",
+    "guardComptroller": "KT1Nq6Ez14Ae7GiJbi4yDxy1YEKC2w8HcVoA",
+    "protocolAddressesPath": "../e2e/deploy_result/deploy.json",
     "tx": {
         "amount": 0,
-        "fee": 1500000,
+        "fee": 100000,
         "gas": 200000,
         "freight": 50000
     },
@@ -82,7 +80,7 @@
         "USDT": 2000000,
         "OXTZ": 5000,
         "WTZ": 5000,
-        "TZBTC":1000
+        "TZBTC": 1000
     },
     "redeem": [
         "TZBTC",
@@ -127,21 +125,17 @@
         }
     ],
     "exactTransferUnderlyings": {
-        "USD": {
-            "address": "KT1RBgHqPFPQX2TWzRAkQDqW5Fvnu3hC2FJb",
-            "tokenStandard": "FA12"
-        },
         "XTZ": {
             "tokenStandard": "XTZ",
             "native": true
         },
         "USDT": {
-            "address": "KT1UhW3RdZ6qDMhkCbztVxFFY4eZ8uzfT5aN",
+            "address": "KT1FthanFQC6p8pdhTzw7bStMNFv9FK98P6J",
             "tokenStandard": "FA2",
             "tokenId": 0
         },
         "TZBTC": {
-            "address": "KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN",
+            "address": "KT1UvK5MZuzE7jWX66qTmQrbmysjUv6kSeLh",
             "tokenStandard": "FA12"
         }
     },

@@ -11,32 +11,112 @@ export async function postDeploy(keystore: KeyStore, signer: Signer, protocolAdd
         await supportMarket(asset.name as AssetType, asset.priceExp, keystore, signer, protocolAddresses);
     for (const asset of config.unpauseMarkets)
         await unpauseMarkets(asset as AssetType, keystore, signer, protocolAddresses);
+    // Required before borrow/redeem liquidity checks: max price age + per-market bounds.
+    await setOracle(keystore, signer, protocolAddresses, protocolAddresses.oracle, config.oracleMaxPriceAge ?? 3600);
+    await setPriceBoundsForListedMarkets(keystore, signer, protocolAddresses);
+}
+
+/** Loose test bounds so Previewnet e2e can update prices freely. */
+const DEFAULT_TEST_PRICE_BOUNDS = {
+    minPrice: 1,
+    maxPrice: '100000000000000000000000000000000000000000000000000', // 10^50
+    maxChangeBps: 10000,
+};
+
+export async function setPriceBoundsForListedMarkets(
+    keystore: KeyStore,
+    signer: Signer,
+    protocolAddresses: ProtocolAddresses,
+) {
+    const boundsCfg = (config as any).priceBounds || DEFAULT_TEST_PRICE_BOUNDS;
+    for (const asset of Object.keys(protocolAddresses.fTokens)) {
+        await setPriceBounds(asset as AssetType, boundsCfg, keystore, signer, protocolAddresses);
+    }
+}
+
+/** Governance that currently administers Comptroller (may differ from redeployed Governance in deploy.json). */
+function comptrollerGovernanceAddress(protocolAddresses: ProtocolAddresses): string {
+    return (config as any).comptrollerGovernance || protocolAddresses.governance;
+}
+
+export async function setPriceBounds(
+    asset: AssetType,
+    bounds: { minPrice: string | number; maxPrice: string | number; maxChangeBps: number },
+    keystore: KeyStore,
+    signer: Signer,
+    protocolAddresses: ProtocolAddresses,
+) {
+    if (!Object.prototype.hasOwnProperty.call(protocolAddresses.fTokens, asset)) {
+        return;
+    }
+    const governance = comptrollerGovernanceAddress(protocolAddresses);
+    log.info(`setPriceBounds ${asset}: min=${bounds.minPrice} max=${bounds.maxPrice} maxChangeBps=${bounds.maxChangeBps} via ${governance}`);
+    const head = await TezosNodeReader.getBlockHead(config.tezosNode);
+    // Micheline layout: Pair(Pair(Pair(cToken, maxChangeBps), Pair(maxPrice, minPrice)), comptroller)
+    const opId = await sendGovernanceOperation({
+        to: protocolAddresses.governance,
+        parameter: {
+            entrypoint: 'setPriceBounds',
+            value: {
+                prim: 'Pair', args: [
+                    { prim: 'Pair', args: [
+                        { prim: 'Pair', args: [
+                            { string: protocolAddresses.fTokens[asset] },
+                            { int: String(bounds.maxChangeBps) },
+                        ]},
+                        { prim: 'Pair', args: [
+                            { int: String(bounds.maxPrice) },
+                            { int: String(bounds.minPrice) },
+                        ]},
+                    ]},
+                    { string: protocolAddresses.comptroller },
+                ],
+            },
+        },
+    },
+        keystore,
+        signer,
+    );
+    await TezosNodeReader.awaitOperationConfirmation(config.tezosNode, head.header.level - 1, opId, 6)
+        .then(res => {
+            if (res['contents'][0]['metadata']['operation_result']['status'] === 'applied') return res;
+            throw new Error('operation status not applied');
+        })
+        .catch((error) => { console.log(error); });
 }
 
 export async function mintFakeTokens(keystore: KeyStore, signer: Signer, protocolAddresses: ProtocolAddresses, address: string){
-    let ops: Transaction[] = []
     for (const asset of config.tokenMint){
-        const res = tokenMint(asset, keystore!, signer!, protocolAddresses!, address, config.mintAmounts[asset]);
-        if(res!=undefined)
-            ops.push(res)
+        if(!Object.prototype.hasOwnProperty.call(protocolAddresses.underlying, asset)) continue;
+        const underlying = protocolAddresses.underlying[asset];
+        const amount = new BigNumber(10).pow(underlying.decimals).multipliedBy(config.mintAmounts[asset]).toFixed();
+        log.info(`minting ${config.mintAmounts[asset]} ${asset} tokens to ${address}`);
+        let payload = "";
+        if (underlying.tokenStandard === TokenStandard.FA12) {
+            payload = `(Pair "${address}" ${amount})`;
+        } else if (underlying.tokenStandard === TokenStandard.FA2) {
+            payload = `(Pair (Pair "${address}" ${amount}) (Pair {Elt "" 0x32} 0))`;
+        }
+        const head = await TezosNodeReader.getBlockHead(config.tezosNode);
+        const result = await TezosNodeWriter.sendContractInvocationOperation(
+            config.tezosNode, signer, keystore,
+            underlying.address!, 0, config.tx.fee, config.tx.freight, config.tx.gas,
+            "mint", payload, TezosParameterFormat.Michelson,
+        );
+        const opId = TezosContractUtils.clearRPCOperationGroupHash(result.operationGroupID);
+        console.log("confirming mint tx - " + opId);
+        await TezosNodeReader.awaitOperationConfirmation(config.tezosNode, head.header.level - 1, opId, 6)
+            .catch((error) => { console.log(error) });
+        console.log("confirmed mint tx - " + opId);
     }
-    const counter = await TezosNodeReader.getCounterForAccount(config.tezosNode, keystore.publicKeyHash);
-    const opGroup = await TezosNodeWriter.prepareOperationGroup(config.tezosNode, keystore, counter, ops, true);
-    const head = await TezosNodeReader.getBlockHead(config.tezosNode)
-    const result = await TezosNodeWriter.sendOperation(config.tezosNode, opGroup, signer);
-    const tokenMintOpId = result["operationGroupID"]
-        .replace(/"/g, "")
-        .replace(/\n/, "");
-    console.log("confirming tx - "+tokenMintOpId)
-    await TezosNodeReader.awaitOperationConfirmation(config.tezosNode, head.header.level - 1, tokenMintOpId, 6).then(res => { if (res['contents'][0]['metadata']['operation_result']['status'] === "applied") return res; else throw new Error("operation status not applied"); }).catch((error) => { console.log(error) });
-    console.log("confirmed tx - " + tokenMintOpId)
 }
 
 export async function setOracle(keystore: KeyStore, signer: Signer, protocolAddresses: ProtocolAddresses, oracleAddress: string, timeDiff: number){
-    log.info(`setting oracle ${oracleAddress}, timeDiff ${timeDiff}`);
+    const governance = comptrollerGovernanceAddress(protocolAddresses);
+    log.info(`setting oracle ${oracleAddress}, timeDiff ${timeDiff} via governance ${governance}`);
     const head = await TezosNodeReader.getBlockHead(config.tezosNode)
     const supportMarketOpId = await sendGovernanceOperation(
-        Governance.SetOracleOperation({ comptrollerAddress: protocolAddresses.comptroller, oracleAddress, timeDiff }, protocolAddresses.governance),
+        Governance.SetOracleOperation({ comptrollerAddress: protocolAddresses.comptroller, oracleAddress, timeDiff }, governance),
         keystore,
         signer,
     );
@@ -80,7 +160,7 @@ async function supportMarket(asset: AssetType, priceExp: number, keystore: KeySt
     log.info(`${JSON.stringify(supportMarket)}`);
     const head = await TezosNodeReader.getBlockHead(config.tezosNode)
     const supportMarketOpId = await sendGovernanceOperation(
-        Governance.SupportMarketOperation(supportMarket, protocolAddresses.governance),
+        Governance.SupportMarketOperation(supportMarket, comptrollerGovernanceAddress(protocolAddresses)),
         keystore,
         signer,
     );
@@ -149,7 +229,7 @@ async function unpauseMarkets(asset: AssetType, keystore: KeyStore, signer: Sign
     log.info(`${JSON.stringify(setMintPaused)}`);
     let head = await TezosNodeReader.getBlockHead(config.tezosNode)
     const setMintPausedOpId = await sendGovernanceOperation(
-        Governance.SetMintPausedOperation(setMintPaused, protocolAddresses.governance),
+        Governance.SetMintPausedOperation(setMintPaused, comptrollerGovernanceAddress(protocolAddresses)),
         keystore,
         signer,
     );
@@ -164,7 +244,7 @@ async function unpauseMarkets(asset: AssetType, keystore: KeyStore, signer: Sign
     };
     head = await TezosNodeReader.getBlockHead(config.tezosNode)
     const setBorrowPausedOpId = await sendGovernanceOperation(
-        Governance.SetBorrowPausedOperation(setBorrowPaused, protocolAddresses.governance),
+        Governance.SetBorrowPausedOperation(setBorrowPaused, comptrollerGovernanceAddress(protocolAddresses)),
         keystore,
         signer,
     );
@@ -179,7 +259,7 @@ async function unpauseMarkets(asset: AssetType, keystore: KeyStore, signer: Sign
     };
     head = await TezosNodeReader.getBlockHead(config.tezosNode)
     const setRedeemPausedOpId = await sendGovernanceOperation(
-        Governance.SetRedeemPausedOperation(setRedeemPaused, protocolAddresses.governance),
+        Governance.SetRedeemPausedOperation(setRedeemPaused, comptrollerGovernanceAddress(protocolAddresses)),
         keystore,
         signer,
     );

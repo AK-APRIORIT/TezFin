@@ -1,7 +1,8 @@
-import { KeyStore, Signer } from 'conseiljs';
+import { KeyStore, Signer, TezosContractUtils, TezosNodeReader, TezosNodeWriter, TezosParameterFormat } from 'conseiljs';
 import { TezosLendingPlatform, FToken, Comptroller, AssetType, ProtocolAddresses, PriceFeed } from 'tezoslendingplatformjs';
 import log from 'loglevel';
-import { ContractOperation, sendOperations } from './operations';
+import { ContractOperation, sendBatchedOperations, sendOperations } from './operations';
+import * as config from '../config/config.json';
 
 export async function mint(asset: AssetType, amount:number, keystore: KeyStore, signer: Signer, protocolAddresses: ProtocolAddresses) {
     let mint: FToken.MintPair = {
@@ -9,7 +10,7 @@ export async function mint(asset: AssetType, amount:number, keystore: KeyStore, 
         amount: amount * Math.pow(10,protocolAddresses.underlying[asset].decimals)
     };
     log.info(`mint ${asset} parameters: ${JSON.stringify(mint)}`);
-    await sendOperations(
+    await sendBatchedOperations(
         TezosLendingPlatform.MintOpGroup(mint, protocolAddresses, keystore.publicKeyHash),
         keystore,
         signer,
@@ -36,8 +37,15 @@ export async function borrow(asset: AssetType, amount:number, _comptroller: Comp
         amount: amount * Math.pow(10,protocolAddresses.underlying[asset].decimals)
     };
     log.info(`borrow ${asset} parameters: ${JSON.stringify(borrow)}`);
-    await sendOperations(
-        TezosLendingPlatform.BorrowOpGroup(borrow, [], protocolAddresses, keystore.publicKeyHash),
+    // prepend accrueInterest for the borrow market so it lands in the same block as borrow
+    const accrueInterestOp: ContractOperation = {
+        to: protocolAddresses.fTokens[asset],
+        amount: 0,
+        mutez: true,
+        parameter: { entrypoint: 'accrueInterest', value: { prim: 'Unit' } },
+    };
+    await sendBatchedOperations(
+        [accrueInterestOp, ...TezosLendingPlatform.BorrowOpGroup(borrow, [], protocolAddresses, keystore.publicKeyHash)],
         keystore,
         signer,
     );
@@ -57,24 +65,25 @@ export async function repayBorrow(asset: AssetType, amount: number, keystore: Ke
 }
 
 interface PriceUpdate {
-    asset: AssetType;
+    /** Oracle override key; Comptroller requests `"${market.name}-USD"` (e.g. USDT-USD). */
+    asset: string;
     price: number;
 }
 
 export async function updatePrice(priceList: PriceUpdate[], oracle: string, keystore: KeyStore, signer: Signer, _protocolAddresses: ProtocolAddresses) {
-    log.info(`updating asset prices : `,JSON.stringify(priceList));
-    await sendOperations([{
-        to: oracle,
-        amount: 0,
-        mutez: true,
-        parameter: {
-            entrypoint: 'setPrice',
-            value: priceList.map(({ asset, price }) => ({
-                prim: 'Pair',
-                args: [{ string: asset }, { int: String(price) }],
-            })),
-        },
-    }], keystore, signer);
+    log.info(`updating asset prices : `, JSON.stringify(priceList));
+    const value = priceList.map(({ asset, price }) => ({
+        prim: 'Pair', args: [{ string: asset }, { int: String(price) }],
+    }));
+    const head = await TezosNodeReader.getBlockHead(config.tezosNode);
+    const result = await TezosNodeWriter.sendContractInvocationOperation(
+        config.tezosNode, signer, keystore,
+        oracle, 0, config.tx.fee, config.tx.freight, config.tx.gas,
+        'setPrice', JSON.stringify(value), TezosParameterFormat.Micheline,
+    );
+    const opId = TezosContractUtils.clearRPCOperationGroupHash(result.operationGroupID);
+    await TezosNodeReader.awaitOperationConfirmation(config.tezosNode, head.header.level - 1, opId, 6)
+        .catch((e) => { console.log(e) });
 }
 
 export async function liquidate(details: FToken.LiquidateDetails, keystore: KeyStore, signer: Signer, protocolAddresses: ProtocolAddresses) {

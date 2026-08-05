@@ -154,53 +154,46 @@ export const mainnetAddresses: ProtocolAddresses = {
 
 export const previewnetAddresses: ProtocolAddresses = {
   fTokens: {
-    XTZ:   "KT1Be9KLArJuSwWGiqxHP7YtpsHUtXzKMzXK",
-    USDT:  "KT1AR3ME1Ag4Hkod6e9bVP5fmRXecu88h7QJ",
-    USD:   "KT1QQBo5mTdCSnk66kNS53hGzQxknRxz9VWT",
-    STXTZ: "KT1MpVTLYnN9W5pbTFu2nUv6JoNfKA4VfUnm",
+    XTZ: "KT1XmELNiNzkPmdUjEdbSQgQjXH6jHHpGFgW",
+    USDT: "KT1JffMQT7GeZqthwuGSkFCCj4y4XyPhf4No",
+    TZBTC: "KT1AJrWNq4Bm3nPxhHse5prj8McfNXiyYsmB",
   },
   fTokensReverse: {
-    KT1Be9KLArJuSwWGiqxHP7YtpsHUtXzKMzXK: AssetType.XTZ,
-    KT1AR3ME1Ag4Hkod6e9bVP5fmRXecu88h7QJ: AssetType.USDT,
-    KT1QQBo5mTdCSnk66kNS53hGzQxknRxz9VWT: AssetType.USD,
-    KT1MpVTLYnN9W5pbTFu2nUv6JoNfKA4VfUnm: AssetType.STXTZ,
+    KT1XmELNiNzkPmdUjEdbSQgQjXH6jHHpGFgW: AssetType.XTZ,
+    KT1JffMQT7GeZqthwuGSkFCCj4y4XyPhf4No: AssetType.USDT,
+    KT1AJrWNq4Bm3nPxhHse5prj8McfNXiyYsmB: AssetType.TZBTC,
   },
   underlying: {
-    USD: {
-      assetType: AssetType.USD,
-      address: "KT1Ho6NbeyyGExTcq74VAEh4vwis51AXrE16",
-      tokenStandard: TokenStandard.FA12,
-      decimals: 6,
-    },
     USDT: {
       assetType: AssetType.USDT,
       tokenStandard: TokenStandard.FA2,
       decimals: 6,
-      address: "KT1QC9jwGx6oUDFiTVDY97rbsHc3UDuBPJBH",
+      address: "KT1FthanFQC6p8pdhTzw7bStMNFv9FK98P6J",
       tokenId: 0,
+    },
+    TZBTC: {
+      assetType: AssetType.TZBTC,
+      tokenStandard: TokenStandard.FA12,
+      decimals: 8,
+      address: "KT1UvK5MZuzE7jWX66qTmQrbmysjUv6kSeLh",
     },
     XTZ: {
       assetType: AssetType.XTZ,
       tokenStandard: TokenStandard.XTZ,
       decimals: 6,
     },
-    STXTZ: {
-      assetType: AssetType.STXTZ,
-      tokenStandard: TokenStandard.FA2,
-      decimals: 6,
-      address: "KT1ENE6cK3PAJDWs5VF8KCzRTihPnywu4waE",
-      tokenId: 0,
-    },
   },
-  comptroller: "KT1DxrZ8vLgqTFqiNWD5GLTeMiYrtBWF2vgt",
+  // Guard handles allowed/paused checks; legacy Comptroller remains the data source for markets/prices.
+  comptroller: "KT1Nq6Ez14Ae7GiJbi4yDxy1YEKC2w8HcVoA",
+  comptrollerDataSource: "KT1GdL5eW8FnsJerGBpkPxkhfiRkjmsjz6Sq",
   interestRateModel: {
-    XTZ:   "KT1X2U77419s1ReGnD9jxNTKwJbu4f73AhS2",
-    USDT:  "KT19rD2vyYv8Szak1qtSUxMgJ5B3kbdMWJgV",
-    USD:   "KT1VwACD1FADmTeWqVUCY4R2XNGmEJx5cGzm",
-    STXTZ: "KT1T5ht1i3QHBkVuprk9VRL7tusqpB3HvTGA",
+    XTZ: "KT1TAw27fRq7ZJyxkbQdWa7rg7KFUyGAYoiq",
+    USDT: "KT1D9NepZxrYxZJrQrjPSyidvFWmdTcVZfxN",
+    TZBTC: "KT1B1AcubPVBtDGFvFMQpgFTmpEF9NEEeEh8",
   },
-  governance: "KT1GNcDLmXBV15dUbydBUptsoARvTGNFa9sq",
-  oracle: "KT1Ks7c9RGiA8MVUniXDzfrSy2KpobNC8UgC",
+  // fToken administrator on this Previewnet stack (not the Comptroller-admin Governance).
+  governance: "KT1CGYiDAzwFmgub9Fr1gHGzLJ6t8154XPup",
+  oracle: "KT1PDyc8SekbDiHB4zZhq5MFTXkNFhDHjPJb",
   network: Network.Previewnet,
 };
 
