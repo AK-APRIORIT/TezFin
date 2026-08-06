@@ -34,7 +34,7 @@ export const useSupplyErrorText = (tokenValue, limit, tokenDetails) => {
         if (!tokenDetails.isListed || tokenDetails.mintPaused) {
             setErrorText('Supplying is temporarily disabled for this market.');
             setDisabled(true);
-        } else if (new BigNumber(tokenValue).gt(new BigNumber(limit))) {
+        } else if (bn(tokenValue).gt(bn(limit))) {
             setText('Insufficient Funds');
             setErrorText('');
             setDisabled(true);
